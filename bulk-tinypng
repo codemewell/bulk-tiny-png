@@ -1,0 +1,106 @@
+#!/usr/local/bin/bash
+
+# Backup your default IFS
+SAVEIFS=IFS
+
+# Overwrite your default IFS
+# It allows to use name with space 
+# in your file and/or directory
+IFS=$(echo -en "\n\b")
+
+
+# It takes the first argment: 
+# Input folder
+FOLDER=$1
+
+# It takes the second argment: 
+# Output folder in your Jottacloud Archive folder
+WHERE=$2
+
+# The API key.
+apikey=NTg26NXZfY5kJBh9K8jVl9Zf7k2DyG3M
+
+# Prompt and ask the user for an API key.
+# Args: none.
+prompt_for_key() {
+    printf 'Get your API key from %s copy and paste it here.\n' "$dev_url"
+    read -p 'Enter your API key: ' apikey
+    echo
+}
+
+echo "Files counting..."
+files_to_process_count=$(find $FOLDER -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) | wc -l)
+
+echo "Files to process: $files_to_process_count"
+echo "Do you want to continue and start processing files? [Y/n]"
+read -r -p "(Press Y for yes N for no) "
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Confirmed."
+
+	# Check and/or get API key.
+	if [[ ! $apikey ]]; then
+			prompt_for_key
+	fi
+
+	# It stores in an array the tree structure 
+	# of the mother folder
+	array=($(find $FOLDER -type d ))
+
+	cnt=-1
+
+	# It finds the tree structure of the mother folder
+	# with the absolute path and iterate over them
+	for i in `find $FOLDER  -type d \( ! -name . \) -exec bash -c 'cd "{}" && pwd' \;` ;do
+
+	# If the iterating item is a folder and it has a 
+	# different name then the input folder, iterate
+	# over all the file inside the folder:
+	if [ -d "$i" ]; then
+		cnt=$((cnt+1))
+			for filename in $i/*  ; do
+				filename1=$(basename "$filename")
+				filename2="${filename1%.*}"
+				extension="${filename##*.}"
+				if [[ ! $extension =~ .*/.* ]]; then
+					if [[ $extension =~ ^jpg|jpeg|png|webp$ ]]; then
+						relative_path=`realpath --relative-to="${PWD}" $i`
+						mkdir -p `printf $WHERE/"$relative_path"`
+						bash tinypng -k `printf "${apikey}"` -d `printf $WHERE/"$relative_path"` -o -- `printf "${filename}"` 
+					fi
+				fi
+			done
+		fi
+	done
+fi
+
+# Print out report
+
+files_to_process=$(find $FOLDER -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \))
+files_results=$(find $WHERE -type f \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' -o -name '*.webp' \) | cut -d '/' -f2-)
+
+failed_files=$(echo ${files_to_process[@]} ${files_results[@]} | tr ' ' '\n' | sort | uniq -u)
+failed_files_count=($(echo "$failed_files" | wc -l))
+failed_files_count_words=($(echo "$failed_files" | wc -w))
+if (( $failed_files_count == 1 && $failed_files_count_words==0)); then
+    failed_files_count="0"
+fi
+
+successful_files_count=($(($files_to_process_count-$failed_files_count)))
+
+echo "Files successfully processed: ${successful_files_count}";
+
+if (( $failed_files_count != 0)); then
+    echo "Files failed processing: ${failed_files_count}"
+    echo ""
+    echo "Failed files:"
+    echo "#########################"
+    printf "%s\n" "${failed_files}"
+    echo "#########################"
+    echo ""
+else
+    echo "Congratulations! No failures."
+fi
+echo "Done."
+
+# Restore default IFS
+IFS=$SAVEIFS
