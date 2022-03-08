@@ -18,7 +18,7 @@ FOLDER=$1
 WHERE=$2
 
 # The API key.
-apikey=NTg26NXZfY5kJBh9K8jVl9Zf7k2DyG3M
+apikey=
 
 # Prompt and ask the user for an API key.
 # Args: none.
